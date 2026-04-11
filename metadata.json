@@ -1,0 +1,5 @@
+{
+  "name": "Remix: SR Monthly Route Planner V18 - 20260117",
+  "description": "An advanced tool to automatically generate monthly sales route plans. Features a sophisticated planning engine that uses K-Means for geographic clustering, a Spatial Coherence Engine to ensure compact zones, an iterative variance-minimization algorithm for monthly balancing, and a Dynamic Scheduling Engine for balanced weekly workloads.",
+  "requestFramePermissions": []
+}
