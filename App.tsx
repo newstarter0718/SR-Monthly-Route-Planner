@@ -186,6 +186,9 @@ const RouteMap = ({
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(mapInstanceRef.current);
+      // Leaflet calculates container size at mount time; when rendered inside a
+      // hidden tab the size is 0.  Force a recalculation once the DOM has settled.
+      setTimeout(() => mapInstanceRef.current?.invalidateSize(), 150);
     }
     return () => {
       popupRef.current?.remove();
