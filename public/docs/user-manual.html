@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SR Monthly Route Planner — 操作手冊</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8f9fa;color:#1a1a2e;line-height:1.7}
+  .container{max-width:900px;margin:0 auto;padding:32px 24px}
+  h1{font-size:2rem;color:#dc2626;margin-bottom:4px}
+  .subtitle{color:#6b7280;margin-bottom:40px;font-size:.95rem}
+  h2{font-size:1.3rem;color:#dc2626;border-left:4px solid #dc2626;padding-left:12px;margin:40px 0 16px}
+  h3{font-size:1.05rem;color:#374151;margin:24px 0 10px;font-weight:600}
+  p{color:#374151;margin-bottom:12px}
+  .step-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin:16px 0}
+  .step-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .step-num{width:36px;height:36px;background:#dc2626;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;margin-bottom:12px}
+  .step-card h3{margin:0 0 8px;color:#111827}
+  .step-card p{color:#6b7280;font-size:.9rem;margin:0}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.9rem;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th{background:#fef2f2;color:#991b1b;font-weight:600;padding:10px 14px;text-align:left;border-bottom:2px solid #fecaca}
+  td{padding:9px 14px;border-bottom:1px solid #f3f4f6;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafafa}
+  .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.8rem;font-weight:600}
+  .badge-red{background:#fee2e2;color:#dc2626}
+  .badge-gray{background:#f3f4f6;color:#6b7280}
+  .badge-green{background:#dcfce7;color:#16a34a}
+  code{background:#f3f4f6;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:.88rem;color:#dc2626}
+  .tip{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:.9rem;color:#92400e}
+  .tip strong{color:#78350f}
+  .info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:.9rem;color:#1e40af}
+  ul,ol{padding-left:20px;margin-bottom:12px;color:#374151}
+  li{margin-bottom:6px}
+  .section{background:#fff;border-radius:12px;padding:28px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #e5e7eb}
+  .freq-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+  .freq-item{display:flex;align-items:center;gap:10px;background:#fef2f2;border-radius:8px;padding:8px 12px}
+  .freq-val{font-weight:700;color:#dc2626;font-size:1.2rem;width:24px;text-align:center}
+  .print-btn{position:fixed;bottom:24px;right:24px;background:#dc2626;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 2px 8px rgba(220,38,38,.4)}
+  @media print{.print-btn{display:none}}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>SR Monthly Route Planner</h1>
+  <p class="subtitle">V18.1 操作手冊 · 業務代表月度路線規劃系統</p>
+
+  <!-- Quick Start -->
+  <div class="section">
+    <h2>快速開始</h2>
+    <div class="step-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <h3>設定參數</h3>
+        <p>設定工作天數（5 或 6 天）、每日拜訪上限、平均行駛速度</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <h3>上傳客戶清單</h3>
+        <p>上傳 CSV 或 Excel 格式的門市資料，系統自動辨識欄位名稱</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <h3>選擇業代 / 群組</h3>
+        <p>若檔案含多群組請選擇業代；若無 group 欄位系統自動以全部門市排程</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <h3>產生計畫</h3>
+        <p>點擊「Generate Plan」，系統在幾秒內輸出四週完整排程</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Format -->
+  <div class="section">
+    <h2>上傳檔案格式</h2>
+    <p>支援 <strong>.csv</strong>、<strong>.xlsx</strong>、<strong>.xls</strong> 格式。欄位名稱自動比對，不區分大小寫，無需修改原始欄位名稱。</p>
+
+    <h3>必填欄位</h3>
+    <table>
+      <thead><tr><th>欄位</th><th>必填</th><th>接受的欄位名稱</th><th>範例</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>latitude</code></td><td><span class="badge badge-red">必填</span></td><td>lat, latitude, 緯度, 座標(緯度)</td><td>24.177629</td><td>十進位度數（小數點格式）</td></tr>
+        <tr><td><code>longitude</code></td><td><span class="badge badge-red">必填</span></td><td>lng, lon, longitude, 經度, 座標(經度)</td><td>120.624199</td><td>十進位度數（小數點格式）</td></tr>
+        <tr><td><code>frequency</code></td><td><span class="badge badge-red">必填</span></td><td>freq, frequency, 頻次, 拜訪頻次, visits</td><td>4</td><td>每月拜訪次數（見下方說明）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>選填欄位</h3>
+    <table>
+      <thead><tr><th>欄位</th><th>接受的欄位名稱</th><th>範例</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>group</code></td><td>group, sr, sr name, 業務代表, 業務, 分組</td><td>PXM</td><td>群組/業代標識。<strong>若無此欄位，所有門市視為同一群組</strong>（以檔名命名）</td></tr>
+        <tr><td><code>id</code></td><td>id, code, 客戶編號, 門店編碼, customerid</td><td>1111091141</td><td>客戶識別碼，缺少時系統自動編號</td></tr>
+        <tr><td><code>name</code></td><td>name, store name, 門店名稱, 客戶名稱</td><td>全聯安和店</td><td>顯示名稱，缺少時顯示 Customer N</td></tr>
+        <tr><td><code>visitTime</code></td><td>visitTime, duration, 拜訪時長, 停留時間</td><td>30</td><td>每次拜訪時長（分鐘），預設 30 分鐘</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Frequency（拜訪頻次）值對照</h3>
+    <div class="freq-grid">
+      <div class="freq-item"><span class="freq-val">8</span><div><strong>Twice a week</strong> — 每週 2 次（每月 8 次）</div></div>
+      <div class="freq-item"><span class="freq-val">4</span><div><strong>Once a week</strong> — 每週 1 次（每月 4 次）</div></div>
+      <div class="freq-item"><span class="freq-val">2</span><div><strong>Twice a month</strong> — 每月 2 次</div></div>
+      <div class="freq-item"><span class="freq-val">1</span><div><strong>Once a month</strong> — 每月 1 次</div></div>
+    </div>
+
+    <div class="tip">
+      <strong>💡 提示：</strong>若來源系統沒有頻次欄位，可依客戶層級推算：A 級 / VIP → 4，一般店 → 2，小型店 → 1。
+    </div>
+  </div>
+
+  <!-- Parameters -->
+  <div class="section">
+    <h2>規劃參數說明</h2>
+    <table>
+      <thead><tr><th>參數</th><th>預設值</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Work Days</strong></td><td>5 Days (Mon–Fri)</td><td>每週工作天數。選 6 天時排程延伸至週六。</td></tr>
+        <tr><td><strong>Daily Visit Limit</strong></td><td>30</td><td>每日最高拜訪門市數。超過此限制的門市進入 Spillover 清單。建議設為實際可達到的上限。</td></tr>
+        <tr><td><strong>Average Speed (km/h)</strong></td><td>30</td><td>用於估算行駛時間。市區建議 25–30，郊區建議 40–50。</td></tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <strong>容量警告：</strong> 系統會自動計算最繁忙的那天所需的拜訪數。若超過設定上限，會顯示黃色警告並建議調整數值。點擊「Apply Suggestion」可一鍵套用。
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="section">
+    <h2>結果解讀</h2>
+
+    <h3>Daily Summary（日彙總）</h3>
+    <table>
+      <thead><tr><th>欄位</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td><code>Date</code></td><td>規劃日期，格式 W1-Mon 表示「第 1 週，週一」</td></tr>
+        <tr><td><code>Visits</code></td><td>當日已排入的門市數量</td></tr>
+        <tr><td><code>Spillovers</code></td><td>因超過每日上限而溢出的門市數（黃色警示）</td></tr>
+        <tr><td><code>Distance (km)</code></td><td>當日路線總行駛距離（公里）</td></tr>
+        <tr><td><code>Drive Time (hr)</code></td><td>估算純行駛時間（小時），不含拜訪停留時間</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Plan Details（路線明細）</h3>
+    <p>點擊任一日期展開明細，可查看當天各門市的拜訪序號、區域、距離等資訊。</p>
+
+    <h3>Route Map（地圖視覺化）</h3>
+    <ul>
+      <li>每個工作日以不同顏色顯示路線</li>
+      <li>點擊地圖上的門市圖示，可查看詳情並即時調整拜訪日期</li>
+      <li>週次選擇器可切換查看 W1–W4 各週路線</li>
+    </ul>
+
+    <h3>Spillover（溢出門市）</h3>
+    <p>因容量不足而無法排入主計畫的門市。點擊「Export Spillover」可匯出，手動安排補訪。</p>
+  </div>
+
+  <!-- Export -->
+  <div class="section">
+    <h2>匯出功能</h2>
+    <table>
+      <thead><tr><th>按鈕</th><th>匯出內容</th><th>檔名格式</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Export Master Plan</strong></td><td>完整四週排程（含日期、序號、距離、座標）</td><td>SR_Monthly_Plan_[群組名].xlsx</td></tr>
+        <tr><td><strong>Export Spillover</strong></td><td>因容量超限而溢出的門市清單</td><td>SR_Spillover_[群組名].xlsx</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- AI Assistant -->
+  <div class="section">
+    <h2>AI 路線助理（Vertex AI · Gemini 2.5 Pro）</h2>
+    <p>產生計畫後，頁面下方會出現 AI Route Assistant 輸入框。可用中文或英文輸入指令，AI 會分析當前計畫並提出建議。</p>
+
+    <h3>使用範例</h3>
+    <table>
+      <thead><tr><th>指令類型</th><th>範例輸入</th></tr></thead>
+      <tbody>
+        <tr><td>分析查詢</td><td>「哪一天的工作量最高？」/ "Which day is most overloaded?"</td></tr>
+        <tr><td>批次調整</td><td>「把所有週五拜訪頻次為 1 的門市移到週六」</td></tr>
+        <tr><td>特定移動</td><td>"Move customer C-001 from Monday to Tuesday"</td></tr>
+        <tr><td>工作量平衡</td><td>「幫我平衡週間的工作量，讓每天差異最小」</td></tr>
+      </tbody>
+    </table>
+
+    <p>AI 回覆後若包含「Proposed changes」，點擊 <strong>Apply Changes</strong> 即可直接套用到路線計畫。</p>
+    <div class="info">
+      <strong>注意：</strong> AI 助理需要後端伺服器（Vertex AI proxy）運行中才能使用。本地開發請先執行 <code>npm run server</code>。Vercel 部署版本已自動啟用。
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="section">
+    <h2>常見問題</h2>
+
+    <h3>❓ 為什麼有些門市進了 Spillover？</h3>
+    <p>當某天的計畫拜訪數超過「Daily Visit Limit」設定值時，多餘的門市會進入 Spillover。解決方式：提高每日上限，或點擊「Apply Suggestion」套用建議值。</p>
+
+    <h3>❓ 上傳後出現 Header Error？</h3>
+    <p>表示系統找不到必填欄位（latitude、longitude、frequency）。請確認：</p>
+    <ul>
+      <li>欄位名稱是否符合「接受的欄位名稱」清單</li>
+      <li>Excel 資料是否在第一個工作表（Sheet1）</li>
+      <li>CSV 是否為 UTF-8 編碼</li>
+    </ul>
+
+    <h3>❓ 四週計畫是以哪個月份為基準？</h3>
+    <p>計畫使用固定四週循環（W1–W4），<strong>不對應實際月份</strong>。日期以「W1-Mon」格式表示，讓每月計畫保持一致性與可重複性。</p>
+
+    <h3>❓ Group（群組）欄位有什麼用途？</h3>
+    <p>一個上傳檔案可以包含多個業代的資料，group 欄位用於區分。若檔案只有一個業代的資料（無 group 欄位），系統會自動以檔名作為群組名稱，直接排程。</p>
+  </div>
+
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ 列印 / 存 PDF</button>
+</body>
+</html>

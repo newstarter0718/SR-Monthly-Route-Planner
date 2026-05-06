@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Customer, Settings, MasterPlanEntry, SpilloverEntry } from './types';
-import { parseCSV, exportToExcel, exportSpilloverToExcel } from './services/fileService';
+import { parseFile, exportToExcel, exportSpilloverToExcel } from './services/fileService';
 import { runPlanningAlgorithm, checkCapacity, reoptimizeDailyRoute } from './services/planningService';
 import { askAI, AIChange } from './services/aiService';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -47,6 +47,80 @@ const ChevronDownIcon = ({ className }: { className?: string }) => (
 const getWeekFromDateString = (dateStr: string): number => {
   const match = dateStr.match(/W(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
+};
+
+// ── RequiredColumnsPanel ─────────────────────────────────────────────────────
+
+const REQUIRED_COLUMNS = [
+  { field: 'latitude',  required: true,  aliases: 'lat, latitude, 緯度, 座標(緯度)',       example: '24.177629' },
+  { field: 'longitude', required: true,  aliases: 'lng, lon, longitude, 經度, 座標(經度)', example: '120.624199' },
+  { field: 'frequency', required: true,  aliases: 'freq, frequency, 頻次, 拜訪頻次',      example: '4' },
+  { field: 'group',     required: false, aliases: 'group, sr, sr name, 業務代表',          example: 'SR-05' },
+  { field: 'id',        required: false, aliases: 'id, code, 客戶編號, 門店編碼',           example: '1111091141' },
+  { field: 'name',      required: false, aliases: 'name, store name, 門店名稱',            example: '全聯安和店' },
+  { field: 'visitTime', required: false, aliases: 'visitTime, duration, 拜訪時長',         example: '30' },
+];
+
+const FREQ_TABLE = [
+  { value: '8', label: 'Twice a week',  note: '每週 2 次' },
+  { value: '4', label: 'Once a week',   note: '每週 1 次' },
+  { value: '2', label: 'Twice a month', note: '每月 2 次' },
+  { value: '1', label: 'Once a month',  note: '每月 1 次' },
+];
+
+const RequiredColumnsPanel = () => {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="border border-gray-200 rounded-lg text-sm overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium transition-colors"
+      >
+        <span>📋 Required Column Format</span>
+        <ChevronDownIcon className={`w-4 h-4 transition-transform text-gray-500 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="p-3 space-y-3 bg-white">
+          <p className="text-xs text-gray-500">Supports <strong>.csv</strong>, <strong>.xlsx</strong>, <strong>.xls</strong>. Column names are matched automatically — case-insensitive.</p>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-100 text-gray-600 uppercase">
+                <th className="p-1.5 text-left font-semibold">Field</th>
+                <th className="p-1.5 text-left font-semibold">Required</th>
+                <th className="p-1.5 text-left font-semibold">Accepted Column Names</th>
+                <th className="p-1.5 text-left font-semibold">Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              {REQUIRED_COLUMNS.map((col, i) => (
+                <tr key={col.field} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="p-1.5 font-mono font-bold text-red-700">{col.field}</td>
+                  <td className="p-1.5 text-center">{col.required ? <span className="text-red-600 font-bold">✅</span> : <span className="text-gray-400">☐</span>}</td>
+                  <td className="p-1.5 text-gray-500">{col.aliases}</td>
+                  <td className="p-1.5 font-mono text-blue-700">{col.example}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div>
+            <p className="text-xs font-semibold text-gray-600 mb-1">Frequency values:</p>
+            <div className="grid grid-cols-2 gap-1">
+              {FREQ_TABLE.map(f => (
+                <div key={f.value} className="flex items-center gap-1.5 bg-gray-50 rounded px-2 py-1">
+                  <span className="font-mono font-bold text-red-600 w-4">{f.value}</span>
+                  <span className="text-gray-600">{f.label}</span>
+                  <span className="text-gray-400 text-xs">({f.note})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 italic">
+            💡 <strong>group</strong> is optional — if absent, all rows are treated as one group named after the filename.
+          </p>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ── GettingStartedGuide — defined outside App to avoid re-creation on every render
@@ -441,10 +515,12 @@ function App() {
       setDetectedGroups([]);
       setSelectedGroup('');
       try {
-        const parsed = await parseCSV(file);
+        const parsed = await parseFile(file);
         setAllCustomers(parsed);
         const groups = [...new Set(parsed.map(c => c.group))].sort();
         setDetectedGroups(groups);
+        // Auto-select when there is only one group (including no-group files)
+        if (groups.length === 1) setSelectedGroup(groups[0]);
       } catch (err: any) {
         setFileError(err.message || 'Failed to parse file.');
       } finally {
@@ -624,8 +700,22 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800 p-4 sm:p-6 lg:p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-red-600">SR Monthly Route Planner</h1>
-        <p className="text-gray-600">V18.0 · Vertex AI Enhanced</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-red-600">SR Monthly Route Planner</h1>
+            <p className="text-gray-600">V18.1 · Vertex AI Enhanced</p>
+          </div>
+          <div className="flex gap-3 mt-1">
+            <a href="/docs/user-manual.html" target="_blank" rel="noopener noreferrer"
+              className="text-sm font-medium text-red-600 border border-red-300 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+              📖 User Manual
+            </a>
+            <a href="/docs/system-logic.html" target="_blank" rel="noopener noreferrer"
+              className="text-sm font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+              ⚙️ System Logic
+            </a>
+          </div>
+        </div>
       </header>
 
       <main>
@@ -660,14 +750,18 @@ function App() {
           <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col space-y-4 shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center"><span className="text-red-600 font-bold mr-2">2.</span> Upload Customer List</h2>
             <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="w-full bg-white text-red-600 border border-red-600 hover:bg-red-600 hover:text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50">
-              {isLoading ? 'Processing…' : 'Upload CSV File'}
+              {isLoading ? 'Processing…' : '📂 Upload CSV or Excel File'}
             </button>
-            <input type="file" ref={fileInputRef} hidden accept=".csv" onChange={handleFileChange} />
-            {fileError && <div className="text-red-700 text-sm p-3 bg-red-100 border border-red-300 rounded-md">{fileError}</div>}
+            <input type="file" ref={fileInputRef} hidden accept=".csv,.xlsx,.xls" onChange={handleFileChange} />
+
+            {/* Required Columns collapsible */}
+            <RequiredColumnsPanel />
+
+            {fileError && <div className="text-red-700 text-sm p-3 bg-red-100 border border-red-300 rounded-md whitespace-pre-wrap">{fileError}</div>}
             {allCustomers.length > 0 && (
               <div className="text-green-800 text-sm p-3 bg-green-100 border border-green-300 rounded-md">
                 <p className="font-bold">Successfully Loaded!</p>
-                <p>{allCustomers.length} customers · {detectedGroups.length} groups</p>
+                <p>{allCustomers.length} customers · {detectedGroups.length} group{detectedGroups.length > 1 ? 's' : ''}</p>
               </div>
             )}
           </div>
@@ -676,11 +770,22 @@ function App() {
           <div className="bg-white border border-gray-200 rounded-xl p-6 flex flex-col space-y-4 shadow-sm">
             <h2 className="text-xl font-semibold text-gray-900 flex items-center"><span className="text-red-600 font-bold mr-2">3.</span> Execute Plan</h2>
             <div>
-              <label htmlFor="group" className="block text-sm font-medium text-gray-600 mb-1">Select Group (Sales Rep)</label>
-              <select id="group" value={selectedGroup} onChange={handleGroupChange} disabled={!detectedGroups.length || isLoading} className="w-full bg-white border-gray-300 rounded-md px-3 py-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50">
-                <option value="">{detectedGroups.length ? 'Select a group' : 'Upload a file first'}</option>
-                {detectedGroups.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
+              <label htmlFor="group" className="block text-sm font-medium text-gray-600 mb-1">
+                Select Group (Sales Rep)
+                {detectedGroups.length === 1 && (
+                  <span className="ml-2 text-xs text-green-600 font-normal">✓ Auto-selected</span>
+                )}
+              </label>
+              {detectedGroups.length <= 1 ? (
+                <div className={`w-full border rounded-md px-3 py-2 text-sm ${detectedGroups.length === 1 ? 'bg-green-50 border-green-300 text-green-800 font-medium' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                  {detectedGroups.length === 1 ? detectedGroups[0] : 'Upload a file first'}
+                </div>
+              ) : (
+                <select id="group" value={selectedGroup} onChange={handleGroupChange} disabled={isLoading} className="w-full bg-white border-gray-300 rounded-md px-3 py-2 focus:ring-red-500 focus:border-red-500 disabled:opacity-50">
+                  <option value="">Select a group…</option>
+                  {detectedGroups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              )}
             </div>
             {frequencyDistribution && (
               <div className="p-3 bg-gray-50 rounded-md text-sm border border-gray-200">

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SR Monthly Route Planner — 系統運算邏輯</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f8f9fa;color:#1a1a2e;line-height:1.7}
+  .container{max-width:960px;margin:0 auto;padding:32px 24px}
+  h1{font-size:2rem;color:#1e40af;margin-bottom:4px}
+  .subtitle{color:#6b7280;margin-bottom:40px;font-size:.95rem}
+  h2{font-size:1.3rem;color:#1e40af;border-left:4px solid #1e40af;padding-left:12px;margin:40px 0 16px}
+  h3{font-size:1.05rem;color:#374151;margin:24px 0 10px;font-weight:600}
+  p{color:#374151;margin-bottom:12px}
+  .section{background:#fff;border-radius:12px;padding:28px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #e5e7eb}
+  .pipeline{display:flex;flex-direction:column;gap:0}
+  .stage{display:flex;align-items:flex-start;gap:16px;padding:16px 0;border-bottom:1px dashed #e5e7eb}
+  .stage:last-child{border-bottom:none}
+  .stage-num{min-width:36px;height:36px;background:#1e40af;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin-top:2px}
+  .stage-body h3{margin:0 0 6px;color:#1e40af}
+  .stage-body p{margin:0;font-size:.92rem;color:#4b5563}
+  code{background:#f0f4ff;padding:1px 6px;border-radius:4px;font-family:monospace;font-size:.88rem;color:#1e40af}
+  .formula{background:#f0f4ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:12px 0;font-family:monospace;font-size:.92rem;color:#1e40af;overflow-x:auto}
+  .formula b{color:#1d4ed8;font-size:1rem}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:.9rem;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  th{background:#eff6ff;color:#1e40af;font-weight:600;padding:10px 14px;text-align:left;border-bottom:2px solid #bfdbfe}
+  td{padding:9px 14px;border-bottom:1px solid #f3f4f6}
+  tr:last-child td{border-bottom:none}
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;margin:16px 0;font-size:.9rem;color:#92400e}
+  .note strong{color:#78350f}
+  ul,ol{padding-left:20px;margin-bottom:12px;color:#374151}
+  li{margin-bottom:6px}
+  .algo-box{background:#1e293b;color:#e2e8f0;border-radius:10px;padding:20px;margin:16px 0;font-family:monospace;font-size:.85rem;line-height:1.8;overflow-x:auto}
+  .algo-box .comment{color:#94a3b8}
+  .algo-box .keyword{color:#7dd3fc}
+  .algo-box .func{color:#86efac}
+  .algo-box .var{color:#fde68a}
+  .print-btn{position:fixed;bottom:24px;right:24px;background:#1e40af;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;box-shadow:0 2px 8px rgba(30,64,175,.4)}
+  @media print{.print-btn{display:none}}
+  .version-tag{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:4px;padding:2px 8px;font-size:.8rem;font-weight:600;margin-left:8px}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>系統運算邏輯說明</h1>
+  <p class="subtitle">SR Monthly Route Planner V18.1 · Planning Engine Technical Reference</p>
+
+  <!-- Overview -->
+  <div class="section">
+    <h2>整體架構概覽</h2>
+    <p>規劃引擎分為六個階段依序執行。每個階段輸入上一階段的結果並加以優化：</p>
+    <div class="pipeline">
+      <div class="stage">
+        <div class="stage-num">1</div>
+        <div class="stage-body">
+          <h3>地理加權 K-Means 分群</h3>
+          <p>將客戶依地理位置與工作量分配到 N 個日度區域（N = 工作天數）</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-num">2</div>
+        <div class="stage-body">
+          <h3>空間內聚性驗證 (Spatial Coherence) <span class="version-tag">V17 新增</span></h3>
+          <p>偵測各區域內的地理離群點，重新指派到更緊湊的鄰近區域</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-num">3</div>
+        <div class="stage-body">
+          <h3>工作量平衡優化</h3>
+          <p>迭代執行「移動」與「交換」操作，最小化各工作日的工作量標準差</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-num">4</div>
+        <div class="stage-body">
+          <h3>動態週排程 <span class="version-tag">V16 新增</span></h3>
+          <p>依頻次將客戶分配到四週中的具體日期，考量週負載與地理鄰近性</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-num">5</div>
+        <div class="stage-body">
+          <h3>每日路線最近鄰優化 (TSP近似)</h3>
+          <p>對每個工作日執行最近鄰演算法，產生有序的拜訪序列</p>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="stage-num">6</div>
+        <div class="stage-body">
+          <h3>距離與時間計算</h3>
+          <p>以 Haversine 公式計算相鄰門市間距離，估算行駛時間</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage 1: K-Means -->
+  <div class="section">
+    <h2>Stage 1：地理加權 K-Means 分群</h2>
+    <h3>目標</h3>
+    <p>將所有客戶分配到 <em>K</em> 個區域（K = 工作天數，5 或 6），每個區域代表業代一天的服務範圍。</p>
+
+    <h3>工作量定義</h3>
+    <p>每位客戶的「月度工作量」為拜訪頻次乘以四週：</p>
+    <div class="formula"><b>monthly_load(c)</b> = frequency(c) × 4</div>
+    <p>例如：frequency=4（每週一次）→ monthly_load = 16；frequency=1（每月一次）→ monthly_load = 4</p>
+
+    <h3>初始化方式</h3>
+    <p>採用 <strong>K-Means++</strong> 初始化策略：第一個中心點隨機選取；後續中心點以「與現有中心點距離平方」為機率權重選取，確保初始中心點分散。</p>
+
+    <h3>迭代收斂</h3>
+    <div class="algo-box">
+<span class="keyword">repeat until</span> centroids converge (max 100 iterations):
+  <span class="comment">// Assignment step</span>
+  <span class="keyword">for each</span> customer c:
+    <span class="var">nearest_zone</span> = argmin<sub>k</sub> haversine(c.lat, c.lng, centroid_k)
+
+  <span class="comment">// Update step (workload-weighted centroid)</span>
+  <span class="keyword">for each</span> zone k:
+    <span class="var">centroid_k.lat</span> = Σ(c.lat × monthly_load(c)) / Σ monthly_load(c)
+    <span class="var">centroid_k.lng</span> = Σ(c.lng × monthly_load(c)) / Σ monthly_load(c)
+    </div>
+    <div class="note">
+      <strong>⚠️ 注意：</strong>使用加權重心（而非簡單平均）可確保高頻客戶密集區域的中心點偏向實際工作負荷的重心，而非地理中心。
+    </div>
+  </div>
+
+  <!-- Stage 2: Spatial Coherence -->
+  <div class="section">
+    <h2>Stage 2：空間內聚性驗證 (V17)</h2>
+    <h3>問題背景</h3>
+    <p>標準 K-Means 雖可平衡工作量，但可能產生「地理上分散」的區域——同一天的路線包含多個分散的群落，造成大量回頭路。</p>
+
+    <h3>離群點偵測演算法</h3>
+    <ol>
+      <li>計算各區域的「核心聚落」：每個客戶與其所在區域中心點的距離</li>
+      <li>計算區域內所有距離的 <strong>75 百分位數 (P75)</strong> 作為基準閾值</li>
+      <li>閾值 = <code>P75 × 1.5</code></li>
+      <li>距離超過閾值的客戶標記為「離群點」</li>
+    </ol>
+    <div class="formula"><b>outlier_threshold(zone)</b> = percentile75(distances_in_zone) × 1.5</div>
+
+    <h3>重新指派邏輯</h3>
+    <p>離群點被重新指派到「地理距離最近且工作量未超載」的鄰近區域，確保：</p>
+    <ul>
+      <li>各區域在地理上保持緊湊</li>
+      <li>沒有任何區域因接收離群點而超過容量上限</li>
+    </ul>
+  </div>
+
+  <!-- Stage 3: Workload Balancing -->
+  <div class="section">
+    <h2>Stage 3：工作量平衡優化</h2>
+    <h3>優化目標</h3>
+    <p>最小化各工作日月度工作量的標準差，使每天的拜訪門市數盡可能均等。</p>
+    <div class="formula"><b>objective</b> = minimize σ(monthly_load_per_zone)</div>
+
+    <h3>操作類型</h3>
+    <table>
+      <thead><tr><th>操作</th><th>說明</th><th>評分公式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Move（移動）</strong></td>
+          <td>將一個客戶從高負載區域移到低負載區域</td>
+          <td><code>score = varianceReduction × 0.7 − geographicCost × 0.3</code></td>
+        </tr>
+        <tr>
+          <td><strong>Swap（交換）</strong></td>
+          <td>交換兩個不同區域的客戶（工作量相近但地理位置互換更合理）</td>
+          <td><code>score = varianceReduction × 0.7 − geographicCost × 0.3</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>收斂條件</h3>
+    <p>迭代直到以下任一條件成立：</p>
+    <ul>
+      <li>工作量標準差 <strong>σ &lt; 2.0</strong></li>
+      <li>連續 3 次迭代無改善</li>
+      <li>達到最大迭代次數上限</li>
+    </ul>
+  </div>
+
+  <!-- Stage 4: Dynamic Scheduling -->
+  <div class="section">
+    <h2>Stage 4：動態週排程 (V16)</h2>
+    <h3>四週循環結構</h3>
+    <p>所有規劃以 <strong>固定四週</strong> 為單位，日期格式為 <code>W{week}-{day}</code>（例：W2-Wed）。</p>
+
+    <table>
+      <thead><tr><th>Frequency</th><th>月度總次數</th><th>排程策略</th></tr></thead>
+      <tbody>
+        <tr><td>8（每週兩次）</td><td>32次</td><td>主要日 + 輔助日（每週兩天）</td></tr>
+        <tr><td>4（每週一次）</td><td>16次</td><td>分配到各週的主要日</td></tr>
+        <tr><td>2（每月兩次）</td><td>8次</td><td>分配到 W1、W3 的主要日</td></tr>
+        <tr><td>1（每月一次）</td><td>4次</td><td>分配到 W1 的主要日</td></tr>
+      </tbody>
+    </table>
+
+    <h3>高頻客戶（Frequency=8）輔助日選擇</h3>
+    <p>對於每週需拜訪兩次的客戶，輔助日依以下加權評分選擇：</p>
+    <div class="formula">
+<b>aux_day_score(day)</b> = <br/>
+  − (weekly_load[day] × 0.6)   <span class="comment" style="color:#6b7280">// 負荷低的日期優先</span><br/>
+  − (distance_to_centroid × 0.4) <span class="comment" style="color:#6b7280">// 地理鄰近的日期優先</span>
+    </div>
+  </div>
+
+  <!-- Stage 5: TSP -->
+  <div class="section">
+    <h2>Stage 5：每日路線最近鄰優化</h2>
+    <h3>演算法說明</h3>
+    <p>採用 <strong>最近鄰啟發式演算法（Nearest Neighbor Heuristic）</strong>，為 TSP（旅行推銷員問題）的近似解：</p>
+    <ol>
+      <li>以區域中心點作為起點</li>
+      <li>從起點出發，每次選擇「尚未拜訪中距離最近」的客戶</li>
+      <li>重複直到所有客戶均完成排序</li>
+    </ol>
+    <div class="algo-box">
+<span class="func">reoptimizeDailyRoute</span>(visits, zone_centroid):
+  <span class="var">route</span> = []
+  <span class="var">current</span> = zone_centroid
+  <span class="var">remaining</span> = [...visits]
+
+  <span class="keyword">while</span> remaining.length > 0:
+    <span class="var">nearest</span> = min(remaining, key=<span class="func">haversine</span>(current, v))
+    route.push(nearest)
+    current = nearest
+    remaining.remove(nearest)
+
+  <span class="keyword">return</span> route (with updated Visit_Sequence)
+    </div>
+    <div class="note">
+      <strong>複雜度：</strong>O(n²)，對於每日 15–40 個門市的規模，執行時間在毫秒內完成。
+    </div>
+  </div>
+
+  <!-- Stage 6: Haversine -->
+  <div class="section">
+    <h2>Stage 6：Haversine 距離公式</h2>
+    <p>所有兩點間距離均使用 Haversine 公式計算，考量地球曲率，單位為公里：</p>
+    <div class="formula">
+<b>haversine(lat1, lng1, lat2, lng2)</b>:<br/>
+  Δlat = (lat2 − lat1) × π/180<br/>
+  Δlng = (lng2 − lng1) × π/180<br/>
+  a = sin²(Δlat/2) + cos(lat1) × cos(lat2) × sin²(Δlng/2)<br/>
+  c = 2 × atan2(√a, √(1−a))<br/>
+  <b>distance</b> = 6371 × c   <span class="comment" style="color:#6b7280">// 地球半徑 6371 km</span>
+    </div>
+
+    <h3>行駛時間估算</h3>
+    <div class="formula"><b>Est_Drive_Time_mins</b> = (distance_km / avgSpeedKmph) × 60</div>
+  </div>
+
+  <!-- Capacity -->
+  <div class="section">
+    <h2>容量計算與 Spillover 邏輯</h2>
+    <h3>每日需求計算</h3>
+    <div class="formula">
+<b>required_daily_visits</b> = Σ monthly_load(c) / (workDays × 4 weeks)<br/>
+<b>required_limit</b> = max(daily_load_per_day_across_4_weeks)
+    </div>
+
+    <h3>Spillover 觸發條件</h3>
+    <p>當某一工作日排入的門市數超過 <code>dailyVisitLimit</code> 時，多餘的門市進入 Spillover 清單，並記錄溢出原因。</p>
+
+    <h3>工作量分析指標</h3>
+    <table>
+      <thead><tr><th>指標</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>Average</td><td>每工作日平均拜訪數</td></tr>
+        <tr><td>Std. Dev.</td><td>工作量標準差（越小越均衡，目標 &lt; 2.0）</td></tr>
+        <tr><td>Range</td><td>最忙碌日與最輕鬆日的拜訪數差距</td></tr>
+        <tr><td>Coeff. Variation</td><td>標準差/平均值，衡量相對變異度（越小越好）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- AI Assistant -->
+  <div class="section">
+    <h2>AI 路線助理架構</h2>
+    <table>
+      <thead><tr><th>元件</th><th>說明</th></tr></thead>
+      <tbody>
+        <tr><td>前端</td><td>React AIAssistant 元件，呼叫 <code>/api/ai/adjust</code> 端點</td></tr>
+        <tr><td>後端</td><td>Vercel Serverless Function（Node.js），接收計畫摘要與指令</td></tr>
+        <tr><td>AI 模型</td><td>Gemini 2.5 Pro（主要），自動 fallback 到 Gemini 2.5 Flash（503 時）</td></tr>
+        <tr><td>認證</td><td>Vertex AI Service Account JSON，儲存於 Vercel 環境變數（server-side only）</td></tr>
+        <tr><td>輸出格式</td><td>強制 JSON，包含 <code>message</code>（說明）+ <code>changes[]</code>（變更指令）</td></tr>
+      </tbody>
+    </table>
+
+    <h3>AI 變更指令結構</h3>
+    <div class="algo-box">
+<span class="comment">// AI 回傳的 changes 陣列元素格式</span>
+{
+  <span class="var">type</span>: <span class="keyword">"move_day"</span>,
+  <span class="var">customerId</span>?: <span class="keyword">"C-001"</span>,        <span class="comment">// 指定單一客戶（選填）</span>
+  <span class="var">fromDay</span>: <span class="keyword">"Fri"</span>,
+  <span class="var">toDay</span>:   <span class="keyword">"Sat"</span>,
+  <span class="var">filter</span>?: {                     <span class="comment">// 批次過濾條件（選填）</span>
+    <span class="var">frequency</span>?: 1,
+    <span class="var">day</span>?: <span class="keyword">"Fri"</span>
+  }
+}
+    </div>
+  </div>
+
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ 列印 / 存 PDF</button>
+</body>
+</html>
