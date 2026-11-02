@@ -1,21 +1,17 @@
 import express from 'express';
 import cors from 'cors';
-import { VertexAI } from '@google-cloud/vertexai';
+import { GoogleGenAI } from '@google/genai';
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000' }));
 app.use(express.json({ limit: '2mb' }));
 
-const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'alexgemini2035-vertex-20260411';
-const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-const PRIMARY_MODEL = 'gemini-2.5-pro';
-const FALLBACK_MODEL = 'gemini-2.5-flash';
+const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'alex-513407';
+const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'global';
+const PRIMARY_MODEL = 'gemini-3.1-pro-preview';
+const FALLBACK_MODEL = 'gemini-3.5-flash';
 
-const vertex = new VertexAI({ project: PROJECT, location: LOCATION });
-
-function getModel(name: string) {
-  return vertex.getGenerativeModel({ model: name });
-}
+const ai = new GoogleGenAI({ vertexai: true, project: PROJECT, location: LOCATION });
 
 app.post('/api/ai/adjust', async (req, res) => {
   const { instruction, planSummary, settings } = req.body as {
@@ -51,12 +47,13 @@ Rules for your JSON response:
 
   for (const modelName of [PRIMARY_MODEL, FALLBACK_MODEL]) {
     try {
-      const model = getModel(modelName);
-      const result = await model.generateContent({
+      const result = await ai.models.generateContent({
+        model: modelName,
         contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userContent}` }] }],
-        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024 },
+        // Gemini 3.x thinking tokens count toward maxOutputTokens; 1024 truncated JSON risk.
+        config: { responseMimeType: 'application/json', maxOutputTokens: 4096 },
       });
-      const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+      const text = result.text ?? '{}';
       const parsed = JSON.parse(text);
       res.json({ model: modelName, ...parsed });
       return;

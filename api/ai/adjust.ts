@@ -1,24 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { VertexAI } from '@google-cloud/vertexai';
+import { createVertexAi } from '../../lib/vertex-auth.js';
 
-const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'alexgemini2035-vertex-20260411';
-const LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-const PRIMARY_MODEL = 'gemini-2.5-pro';
-const FALLBACK_MODEL = 'gemini-2.5-flash';
+const PROJECT = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || 'alex-513407';
+const LOCATION = process.env.GCP_WORKLOAD_IDENTITY_POOL_ID ? 'global' : (process.env.GOOGLE_CLOUD_LOCATION || 'global');
+const PRIMARY_MODEL = 'gemini-3.1-pro-preview';
+const FALLBACK_MODEL = 'gemini-3.5-flash';
 
 function getVertex() {
-  // On Vercel: credentials come as a JSON string env var
-  const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  if (credsJson) {
-    const credentials = JSON.parse(credsJson);
-    return new VertexAI({
-      project: PROJECT,
-      location: LOCATION,
-      googleAuthOptions: { credentials },
-    });
-  }
-  // Local dev fallback: use file-based credentials (GOOGLE_APPLICATION_CREDENTIALS)
-  return new VertexAI({ project: PROJECT, location: LOCATION });
+  return createVertexAi(PROJECT, LOCATION);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -60,12 +49,13 @@ Rules for your JSON response:
 
   for (const modelName of [PRIMARY_MODEL, FALLBACK_MODEL]) {
     try {
-      const model = vertex.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent({
+      const result = await vertex.models.generateContent({
+        model: modelName,
         contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\nInstruction: ${instruction}` }] }],
-        generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024 },
+        // Gemini 3.x thinking tokens count toward maxOutputTokens; 1024 truncated JSON risk.
+        config: { responseMimeType: 'application/json', maxOutputTokens: 4096 },
       });
-      const text = result.response.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+      const text = result.text ?? '{}';
       const parsed = JSON.parse(text);
       res.status(200).json({ model: modelName, ...parsed });
       return;

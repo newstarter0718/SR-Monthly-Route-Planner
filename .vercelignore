@@ -1,0 +1,8 @@
+.git/
+.claude/
+.codex/
+.env*
+node_modules/
+dist/
+*.bak
+*.bak_*
