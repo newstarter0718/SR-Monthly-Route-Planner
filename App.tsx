@@ -579,9 +579,12 @@ function App() {
 
   const workloadAnalysis = useMemo(() => {
     if (!summaryReport) return null;
-    const byDay = summaryReport.reduce((acc, r) => { acc[r.day] = (acc[r.day] ?? 0) + r.visits; return acc; }, {} as Record<string, number>);
-    const loads = Object.values(byDay) as number[];
-    if (!loads.length) return null;
+    // The planning cycle always has four weeks, including weeks with no visits.
+    const loads = [0, 0, 0, 0];
+    for (const row of summaryReport) {
+      const week = /^W([1-4])-/.exec(row.date);
+      if (week) loads[Number(week[1]) - 1] += row.visits;
+    }
     const mean = loads.reduce((a, b) => a + b, 0) / loads.length;
     const variance = loads.reduce((s, v) => s + (v - mean) ** 2, 0) / loads.length;
     const stdDev = Math.sqrt(variance);
