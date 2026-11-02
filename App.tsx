@@ -383,7 +383,7 @@ const AIAssistant = ({
     <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mt-6">
       <h2 className="text-xl font-semibold text-gray-900 mb-1 flex items-center gap-2">
         <span className="text-red-600">✦</span> AI Route Assistant
-        <span className="text-xs font-normal text-gray-400 ml-1">(Vertex AI · Gemini 2.5 Pro)</span>
+        <span className="text-xs font-normal text-gray-400 ml-1">(Vertex AI)</span>
       </h2>
       <p className="text-sm text-gray-500 mb-4">
         Ask in plain English — e.g. "Which day is most overloaded?" or "Move all Friday frequency-1 customers to Saturday."
